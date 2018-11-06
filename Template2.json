@@ -1,0 +1,183 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "dnsServers": {
+            "type": "string",
+            "defaultValue": "10.115.115.10",
+            "allowedValues": [
+                "10.115.115.10",
+                "10.200.115.10",
+                "10.250.115.10"
+            ],
+            "metadata": {
+                "description": "Add the network DNS server"
+            }
+        },
+        "vnetName": {
+            "type": "string",
+            "defaultValue": "VNet115",
+            "metadata": {
+                "description": "VNet name"
+            }
+        },
+        "vnetAddressPrefix1": {
+            "type": "string",
+            "defaultValue": 
+                "10.115.0.0/16",
+            "metadata": {
+                "description": "First Address prefix"
+            }
+        },
+        "vnetAddressPrefix2": {
+            "type": "string",
+            "defaultValue": 
+                "192.168.115.0/24",
+            "metadata": {
+                "description": "Second Address prefix"
+            }
+        },
+        "subnet1Prefix": {
+            "type": "string",
+            "defaultValue": "10.115.100.0/24",
+            "metadata": {
+                "description": "Server Subnet Prefix"
+            }
+        },
+        "subnet1Name": {
+            "type": "string",
+            "defaultValue": "SvrSub115",
+            "metadata": {
+                "description": "Subnet SVR100 Name"
+            }
+        },
+        "subnet2Prefix": {
+            "type": "string",
+            "defaultValue": "192.168.115.0/24",
+            "metadata": {
+                "description": "DMZ Prefix"
+            }
+        },
+        "subnet2Name": {
+            "type": "string",
+            "defaultValue": "DmzSub115",
+            "metadata": {
+                "description": "DMZ Subnet"
+            }
+        },
+        "nsg1Name": {
+            "type": "string",
+            "defaultValue": "DmzNsg115",
+            "metadata": {
+                "description": "NSG DMZ 100 Name"
+            }
+        }
+    },
+    "variables": {
+        "location": "[resourceGroup().location]",
+        "tagValues": {
+            "Dept": "IT",
+            "Environment": "Production",
+            "Service": "Core"
+        },
+        "nsg1Id": "[concat(resourceId('Microsoft.Network/networkSecurityGroups/', parameters('nsg1Name')))]"
+    },
+    "resources": [
+        {
+            "apiVersion": "2018-08-01",
+            "type": "Microsoft.Network/virtualNetworks",
+            "name": "[parameters('vnetName')]",
+            "location": "[variables('location')]",
+            "tags": "[variables('tagValues')]",
+            "dependsOn": [
+                "[variables('nsg1Id')]"
+            ],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[parameters('vnetAddressPrefix1')]",
+                        "[parameters('vnetAddressPrefix2')]"
+                    ]
+                },
+                "dhcpOptions": {
+                    "dnsServers": [
+                        "[parameters('dnsServers')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[parameters('subnet1Name')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('subnet1Prefix')]"
+                        }
+                    },
+                    {
+                        "name": "[parameters('subnet2Name')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('subnet2Prefix')]",
+                            "networkSecurityGroup": {
+                                "id": "[variables('nsg1Id')]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "apiVersion": "2018-08-01",
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[parameters('nsg1Name')]",
+            "location": "[variables('location')]",
+            "tags": "[variables('tagValues')]",
+            "comments": "Verify default rules are applied, 168.63.129.16 in needed for Azure management. RDP may need to be open outside the FW for management",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "Allow_10.115.100.0_RDP_In",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "3389",
+                            "sourceAddressPrefix": "10.115.100.0/24",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 150,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    },
+                    {
+                        "name": "Block_RDP_in",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "3389",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Deny",
+                            "priority": 175,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "outputs": {
+        "Network Security Group": {
+            "type": "string",
+            "value": "[variables('nsg1Id')]"
+        },
+        "VNet Name": {
+            "type": "string",
+            "value": "[parameters('vnetName')]"
+        }
+    }
+}
